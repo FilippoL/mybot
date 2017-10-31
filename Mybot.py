@@ -23,7 +23,7 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Rege
 import logging
 import sqlite3
 import uuid
-
+import os
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -31,25 +31,18 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-GENDER, AGE, LOCATION, QUESTION = range(4)
+GENDER, AGE, LOCATION, QUESTION, FILLS_DB = range(5)
 
 class database:
     def __init__(self):#this is a contrucstor
         db = sqlite3.connect("my_bot_database.db")
         db.row_factory = sqlite3.Row
-        db.execute('drop table if exists users')
-        db.execute('create table users ( ID text, nationality text, age int, gender text )')
-        db.execute('drop table if exists questions')
-        db.execute('create table questions ( ID text, question text, topic text )')
-        db.execute('drop table if exists answers')
-        db.execute('create table answers ( ID_one text, ID_two text, answer text )')
-        db.commit
+        db.execute('CREATE TABLE IF NOT EXISTS users ( ID text, nationality text, age int, gender text )')
+        db.execute('CREATE TABLE IF NOT EXISTS questions ( ID text, question text, topic text )')
+        db.execute('CREATE TABLE IF NOT EXISTS answers ( ID_one text, ID_two text, answer text )')
+        db.commit()
         db.close()
-        return
 
-    def getID(self):
-
-        return 1
 
 
     def __iter__(self):
@@ -59,16 +52,17 @@ class database:
             yield dict(row)
         db.close()
 
+    def get_property(self, key):
+            return self.user_prop.get(None, key)
 
 class t_users(database):
 
-    def FillNewUser(selfm, nationality = "", age = 0, gender = ""):
-        _ID = str(uuid.uuid4())
+    def FillNewUser(selfm, _id = "", nationality = "", age = 0, gender = ""):
         db = sqlite3.connect("my_bot_database.db")
-        db.execute('insert into users (ID, nationality, age, gender) values (?, ?, ?, ?)', (_ID, nationality.lower(), age, gender.lower()))
+        db.execute('insert into users (ID, nationality, age, gender) values (?, ?, ?, ?)', (_id, nationality.lower(), age, gender.lower()))
         db.commit()
         db.close()
-        return _ID
+
 
     def GetUserAge(self, key):
         pass
@@ -94,13 +88,11 @@ def skip_gender(bot, update):
                               reply_markup=ReplyKeyboardRemove())
     return AGE
 
-
 def gender(bot, update):
     user = update.message.from_user
     logger.info("Gender of %s: %s" % (user.first_name, update.message.text))
-
-    file = open("users.txt", 'a')
-    file.write("%s\n Gender: %s\n" % (user.first_name, update.message.text))
+    with open("inf.txt", "w") as _file:
+        _file.write("%s\n" % (update.message.text))
 
     update.message.reply_text('How old are you?\n'
                               'Send /skip to skip the question',
@@ -112,7 +104,7 @@ def skip_age(bot, update):
     user = update.message.from_user
     logger.info("User %s did not send gender." % user.first_name)
     update.message.reply_text('You seem a bit paranoid! '
-                              'At least, send me your location.')
+                              'At least, tell me where you are from.')
 
     return LOCATION
 
@@ -120,10 +112,10 @@ def age(bot, update):
     user = update.message.from_user
     logger.info("Age of %s: %s" % (user.first_name, update.message.text))
 
-    file = open("users.txt" , 'a')
-    file.write(" Age: %s\n" % update.message.text)
+    with open("inf.txt", "a") as _file:
+        _file.write("%s\n" % (update.message.text))
 
-    update.message.reply_text('Thanks! Now, send me your location please,\n'
+    update.message.reply_text('Thanks! Now, could you please give me your nationality?\n'
                               'Send /skip to skip the question')
 
     return LOCATION
@@ -140,12 +132,9 @@ def skip_location(bot, update):
 def location(bot, update):
 
     user = update.message.from_user
-    user_location = update.message.location
-    logger.info("Location of %s: %f / %f"
-                % (user.first_name, user_location.latitude, user_location.longitude))
-    file = open("users.txt", 'a')
-    file.write(" Location: %f / %f\n"
-                % (user_location.latitude, user_location.longitude))
+    logger.info("Nationality of %s: %s " % (user.first_name, update.message.text))
+    with open("inf.txt", "a") as _file:
+        _file.write("%s\n" % (update.message.text))
 
     update.message.reply_text('Maybe I can visit you sometime!\n'
                               'Could you please make me a question?\n'
@@ -157,12 +146,12 @@ def recieve_question(bot, update):
     user = update.message.from_user
     logger.info("%s sent some text" % user.first_name)
 
-    file = open('questions.txt', 'w')
-    file.write("\n" + update.message.text)
-
-    update.message.reply_text('Thank you! I hope we can talk again some day.')
-
-    return ConversationHandler.END
+    with open("inf.txt", "a") as _file:
+        _file.write("%s\n" % (update.message.text))
+        _file.close()
+    update.message.reply_text('Thank you! ')
+    update.message.reply_text('If you agree with your data being anonimously stored press any key ')
+    return FILLS_DB
 
 def cancel(bot, update):
     user = update.message.from_user
@@ -172,18 +161,31 @@ def cancel(bot, update):
 
     return ConversationHandler.END
 
-
 def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
 def filecheck(file_name):
     try:
         open(file_name, "r") #try open file for reading
-        return 1 #return if success
+        logger.info("File found \n")
+        return  #return if success
 
     except IOError: #lets make use of the default file i/o library exception handler
-        logger.info("No database found, creating one... \n")
-        return 0
+        logger.info("No file found \n")
+        return
+
+def filling_up(bot, update):
+
+    try:
+        with open("inf.txt", "r") as _file:
+            lines = _file.readlines()
+            lines = [x.strip() for x in lines]
+            _newuser = t_users()
+            _newuser.FillNewUser(str(uuid.uuid4()), lines[2], int(lines[1]), lines[0])
+    except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
+        logger.warn("ERROR")
+
+    return ConversationHandler.END
 
 
 def main():
@@ -193,16 +195,7 @@ def main():
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
 
-    _newuser = t_users()
-    _newuser.FillNewUser("italian", 23, "male")
-
-
-
-    if filecheck('my_bot_database.db'):
-        logger.info("Database found \n")
-    else:
-        initialise_database()
-
+    filecheck('my_bot_database.db')
 
     # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
     conv_handler = ConversationHandler(
@@ -216,10 +209,12 @@ def main():
             AGE: [MessageHandler(Filters.text, age),
                        CommandHandler('skip', skip_age)],
 
-            LOCATION: [MessageHandler(Filters.location, location),
+            LOCATION: [MessageHandler(Filters.text, location),
                        CommandHandler('skip', skip_location)],
 
             QUESTION: [MessageHandler(Filters.text, recieve_question)],
+
+            FILLS_DB:  [MessageHandler(Filters.all, filling_up)],
 
         },
 
