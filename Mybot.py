@@ -91,7 +91,10 @@ def skip_gender(bot, update):
 def gender(bot, update):
     user = update.message.from_user
     logger.info("Gender of %s: %s" % (user.first_name, update.message.text))
-    with open("inf.txt", "w") as _file:
+
+    final = str(user.id) + ".txt"
+
+    with open(final, "w") as _file:
         _file.write("%s\n" % (update.message.text))
 
     update.message.reply_text('How old are you?\n'
@@ -112,7 +115,9 @@ def age(bot, update):
     user = update.message.from_user
     logger.info("Age of %s: %s" % (user.first_name, update.message.text))
 
-    with open("inf.txt", "a") as _file:
+    final = str(user.id) + ".txt"
+
+    with open(final, "a") as _file:
         _file.write("%s\n" % (update.message.text))
 
     update.message.reply_text('Thanks! Now, could you please give me your nationality?\n'
@@ -133,7 +138,10 @@ def location(bot, update):
 
     user = update.message.from_user
     logger.info("Nationality of %s: %s " % (user.first_name, update.message.text))
-    with open("inf.txt", "a") as _file:
+
+    final = str(user.id) + ".txt"
+
+    with open(final, "a") as _file:
         _file.write("%s\n" % (update.message.text))
 
     update.message.reply_text('Maybe I can visit you sometime!\n'
@@ -146,7 +154,9 @@ def recieve_question(bot, update):
     user = update.message.from_user
     logger.info("%s sent some text" % user.first_name)
 
-    with open("inf.txt", "a") as _file:
+    final = str(user.id) + ".txt"
+
+    with open(final, "a") as _file:
         _file.write("%s\n" % (update.message.text))
         _file.close()
     update.message.reply_text('Thank you! ')
@@ -176,14 +186,21 @@ def filecheck(file_name):
 
 def filling_up(bot, update):
 
+    user = update.message.from_user
+
+    final = str(user.id) + ".txt"
+
     try:
-        with open("inf.txt", "r") as _file:
+        with open(final, "r") as _file:
             lines = _file.readlines()
             lines = [x.strip() for x in lines]
             _newuser = t_users()
-            _newuser.FillNewUser(str(uuid.uuid4()), lines[2], int(lines[1]), lines[0])
+            _newuser.FillNewUser(str(user.id), lines[2], int(lines[1]), lines[0])
+            _file.close()
     except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
         logger.warn("ERROR")
+
+    os.remove(final)
 
     return ConversationHandler.END
 
