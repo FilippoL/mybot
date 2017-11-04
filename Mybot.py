@@ -43,8 +43,6 @@ class database:
         db.commit()
         db.close()
 
-
-
     def __iter__(self):
         db = sqlite3.connect("my_bot_database.db")
         cursor = db.execute('select * from users')
@@ -57,15 +55,33 @@ class database:
 
 class t_users(database):
 
-    def FillNewUser(selfm, _id = "", nationality = "", age = 0, gender = ""):
+    def FillNewUser(self, _id = "", _nationality = "", _age = 0, _gender = ""):
         db = sqlite3.connect("my_bot_database.db")
-        db.execute('insert into users (ID, nationality, age, gender) values (?, ?, ?, ?)', (_id, nationality.lower(), age, gender.lower()))
+        db.execute('insert into users (ID, nationality, age, gender) values (?, ?, ?, ?)', (_id, _nationality.lower(), _age, _gender.lower()))
         db.commit()
         db.close()
 
 
     def GetUserAge(self, key):
         pass
+
+class t_questions(database):
+
+    def FillNewQuestion(self, _id = "", _question = "", _topic = ""):
+        db = sqlite3.connect("my_bot_database.db")
+        db.execute('insert into questions (ID, question, topic) values (?, ?, ?)', (_id, _question.lower(), _topic.lower()))
+        db.commit()
+        db.close()
+
+    def GetQuestionByTopic(self, _topic = ""):
+        db = sqlite3.connect("my_bot_database.db")
+        crsr = db.cursor()
+        crsr = db.execute('select question from questions where topic = ? ', (_topic, ))
+        q_str = crsr.fetchall()
+        db.commit()
+        db.close()
+        return q_str
+
 
 def start(bot, update):
     reply_keyboard = [['Boy', 'Girl', 'Other']]
@@ -196,6 +212,9 @@ def filling_up(bot, update):
             lines = [x.strip() for x in lines]
             _newuser = t_users()
             _newuser.FillNewUser(str(user.id), lines[2], int(lines[1]), lines[0])
+            _newquestion = t_questions()
+            _newquestion.FillNewQuestion(str(user.id), lines[3], "brexit")
+            _newquestion.GetQuestionByTopic("brexit")[1][0]
             _file.close()
     except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
         logger.warn("ERROR")
@@ -230,6 +249,7 @@ def main():
                        CommandHandler('skip', skip_location)],
 
             QUESTION: [MessageHandler(Filters.text, recieve_question)],
+
 
             FILLS_DB:  [MessageHandler(Filters.all, filling_up)],
 
