@@ -177,7 +177,8 @@ def recieve_question(bot, update):
         _file.close()
     update.message.reply_text('Thank you! ')
     update.message.reply_text('If you agree with your data being anonimously stored press any key ')
-    return FILLS_DB
+    
+    return filling_up(user,update)
 
 def cancel(bot, update):
     user = update.message.from_user
@@ -200,21 +201,19 @@ def filecheck(file_name):
         logger.info("No file found \n")
         return
 
-def filling_up(bot, update):
+def filling_up(_user,_update):
 
-    user = update.message.from_user
-
-    final = str(user.id) + ".txt"
+    final = str(_user.id) + ".txt"
 
     try:
         with open(final, "r") as _file:
             lines = _file.readlines()
             lines = [x.strip() for x in lines]
             _newuser = t_users()
-            _newuser.FillNewUser(str(user.id), lines[2], int(lines[1]), lines[0])
+            _newuser.FillNewUser(str(_user.id), lines[2], int(lines[1]), lines[0])
             _newquestion = t_questions()
-            _newquestion.FillNewQuestion(str(user.id), lines[3], "brexit")
-            _newquestion.GetQuestionByTopic("brexit")[1][0]
+            _newquestion.FillNewQuestion(str(_user.id), lines[3], "brexit")
+            _update.message.reply_text(_newquestion.GetQuestionByTopic("brexit")[1][0])
             _file.close()
     except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
         logger.warn("ERROR")
@@ -249,10 +248,6 @@ def main():
                        CommandHandler('skip', skip_location)],
 
             QUESTION: [MessageHandler(Filters.text, recieve_question)],
-
-
-            FILLS_DB:  [MessageHandler(Filters.all, filling_up)],
-
         },
 
         fallbacks=[CommandHandler('cancel', cancel)]
