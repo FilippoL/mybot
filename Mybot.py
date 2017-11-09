@@ -19,11 +19,12 @@ from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
                           ConversationHandler)
 
-
 import logging
 import sqlite3
 import uuid
 import os
+import random
+
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -31,7 +32,13 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-GENDER, AGE, LOCATION, QUESTION, FILLS_DB = range(5)
+GENDER, AGE, LOCATION, FILL_QUESTION, FILL_USER_DATA, ASK_QUESTION, FILL_ANSWER = range(7)
+
+topics = ('brexit', 'food', 'music', 'sport')
+
+current_topic = 0
+current_question = 0
+current_message = 0
 
 class database:
     def __init__(self):#this is a contrucstor
@@ -81,6 +88,25 @@ class t_questions(database):
         db.commit()
         db.close()
         return q_str
+
+    def GetIDByQuestion(self, _topic = ""):
+        db = sqlite3.connect("my_bot_database.db")
+        crsr = db.cursor()
+        crsr = db.execute('select ID from questions where topic = ? ', (_topic,  ))
+        ID = crsr.fetchall()[current_question][0]
+        db.commit()
+        db.close()
+        return ID
+
+class t_answers(database):
+
+    def FillNewAnswer(self, _id_shared_with_user = "", _id_shared_with_question = "" ,  _answer = ""):
+        db = sqlite3.connect("my_bot_database.db")
+        db.execute('insert into answers (ID_one, ID_two, answer) values (?, ?, ?)', (_id_shared_with_user, _id_shared_with_question, _answer.lower()))
+        db.commit()
+        db.close()
+
+
 
 
 def start(bot, update):
@@ -144,11 +170,9 @@ def age(bot, update):
 def skip_location(bot, update):
     user = update.message.from_user
     logger.info("User %s did not send age." % user.first_name)
-    update.message.reply_text('You seem a bit paranoid! '
-                              'Could you please make me a question?\n'
-                              'Bare in mind I might not be able to anwer')
 
-    return QUESTION
+
+    return FILL_QUESTION
 
 def location(bot, update):
 
@@ -160,13 +184,63 @@ def location(bot, update):
     with open(final, "a") as _file:
         _file.write("%s\n" % (update.message.text))
 
-    update.message.reply_text('Maybe I can visit you sometime!\n'
-                              'Could you please make me a question?\n'
-                              'Bare in mind I might not be able to anwer')
 
-    return QUESTION
+    #update.message.reply_text('PRESS ANY BUTTON IF YOU AGREE TO STORE YOUR DATA')
+    return FILL_USER_DATA
 
-def recieve_question(bot, update):
+
+def fill_user(bot, update):
+    _user = update.message.chat
+
+    final = str(_user.id) + ".txt"
+
+    try:
+        with open(final, "r") as _file:
+            lines = _file.readlines()
+            lines = [x.strip() for x in lines]
+            _newuser = t_users()
+            _newuser.FillNewUser(str(_user.id), lines[2], int(lines[1]), lines[0])
+            _file.close()
+    except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
+        logger.warn("ERROR")
+
+    os.remove(final)
+
+    current_topic = 1 #random.randint(1, len(topics))
+
+    update.message.reply_text('Lets talk about '+ topics[current_topic])
+
+
+    return ASK_QUESTION
+
+
+def ask_question(bot, update):
+
+    user = current_message
+    _newquestion = t_questions()
+    _str_question = str(_newquestion.GetQuestionByTopic(topics[current_topic])[current_question][0])
+    update.message.reply_text(_str_question)
+
+    return FILL_ANSWER
+
+def fill_answer(bot, update):
+
+    _user = user()
+
+    try:
+        _newquestion = t_questions()
+
+        _newanswer = t_answer()
+        _newquestion.FillNewAnswer(str(_user.id), str(_newquestion.GetIDByQuestion(topics[current_topic])), str(update.message.text))
+        #_newquestion.GetQuestionByTopic("brexit")[1][0]
+
+    except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
+        logger.warn("ERROR")
+
+    os.remove(final)
+    return ConversationHandler.END
+
+def recieve_question(bot, update): #answer the question
     user = update.message.from_user
     logger.info("%s sent some text" % user.first_name)
 
@@ -177,7 +251,7 @@ def recieve_question(bot, update):
         _file.close()
     update.message.reply_text('Thank you! ')
     update.message.reply_text('If you agree with your data being anonimously stored press any key ')
-    return FILLS_DB
+    return FILL_USER_DATA
 
 def cancel(bot, update):
     user = update.message.from_user
@@ -200,28 +274,24 @@ def filecheck(file_name):
         logger.info("No file found \n")
         return
 
-def filling_up(bot, update):
+
+
+
+def fill_question(bot, update):
 
     user = update.message.from_user
-
     final = str(user.id) + ".txt"
 
     try:
-        with open(final, "r") as _file:
-            lines = _file.readlines()
-            lines = [x.strip() for x in lines]
-            _newuser = t_users()
-            _newuser.FillNewUser(str(user.id), lines[2], int(lines[1]), lines[0])
-            _newquestion = t_questions()
-            _newquestion.FillNewQuestion(str(user.id), lines[3], "brexit")
-            _newquestion.GetQuestionByTopic("brexit")[1][0]
-            _file.close()
+        _newquestion = t_questions()
+        _newquestion.FillNewQuestion(str(user.id), lines[3], "brexit")
+        _newquestion.GetQuestionByTopic("brexit")[1][0]
+
     except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
         logger.warn("ERROR")
 
     os.remove(final)
-
-    return ConversationHandler.END
+    return FILL_ANSWER
 
 
 def main():
@@ -248,10 +318,14 @@ def main():
             LOCATION: [MessageHandler(Filters.text, location),
                        CommandHandler('skip', skip_location)],
 
-            QUESTION: [MessageHandler(Filters.text, recieve_question)],
+            FILL_USER_DATA:  [MessageHandler(Filters.all, fill_user)],
 
+            #LOOP Q&A STARTS HERE
+            ASK_QUESTION:  [MessageHandler(Filters.all, ask_question)],
 
-            FILLS_DB:  [MessageHandler(Filters.all, filling_up)],
+            FILL_ANSWER:  [MessageHandler(Filters.all, fill_answer)],
+
+            FILL_QUESTION: [MessageHandler(Filters.text, recieve_question)],
 
         },
 
