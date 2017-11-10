@@ -282,8 +282,7 @@ def answer_question(_user, _update):
         _update.message.reply_text(_newanswer.GetAnswerByQuestionID(temp_ID)[0])#indexing for answers
     
     else: 
-         _update.message.reply_text('I dont an answer for that yet \n')
-         print(temp_ID)
+         _update.message.reply_text('I don t have an answer for that question yet \n')
 
     return ask_question(_user, _update)     
  
@@ -324,6 +323,8 @@ def filling_question(_user,_update):
 
     _newquestion = t_questions()
     _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, topics[current_topic])    
+
+    _update.message.reply_text('I don t have an answer for that question yet \n')
 
     return ask_question(_user,_update)
 
