@@ -16,8 +16,7 @@ bot.
 """
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler,
-                          ConversationHandler)
+from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler, ConversationHandler)
 
 import logging
 import uuid
@@ -37,8 +36,16 @@ topics = ("brexit", "food")
 
 current_topic = 0
 current_question = 0
+unanswered_question = 0
+
+current_topic_max_questions = 0
+filled = False
 
 GENDER, AGE, LOCATION, QUESTION, ANSWER = range(5)
+
+def toggleFilled():
+    global filled
+    filled = True
 
 def start(bot, update):
     reply_keyboard = [['Boy', 'Girl', 'Other']]
@@ -48,17 +55,12 @@ def start(bot, update):
     update.message.reply_text('Honesty is appreciated :)')
     #update.message.reply_text('Remember to send /skip if you dont want to answer them')
 
-    update.message.reply_text('Are you a boy or a girl?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
+    _newquestion = Question.t_questions()
+    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(topics[current_topic]))
 
+    update.message.reply_text('Are you a boy or a girl?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return GENDER
 
-#def skip_gender(bot, update):
-#    user = update.message.from_user
-#    logger.info("User %s did not send gender." % user.first_name)
-#
-#    update.message.reply_text('Not a problem, but can you tell me your age?', reply_markup=ReplyKeyboardRemove())
-#
-#    return AGE
 
 def gender(bot, update):
     user = update.message.from_user
@@ -74,14 +76,6 @@ def gender(bot, update):
 
     return AGE
 
-#def skip_age(bot, update):
-#    user = update.message.from_user
-#    logger.info("User %s did not send gender." % user.first_name)
-#
-#    update.message.reply_text('Not a problem, but can you tell me where are you from?')
-#
-#    return LOCATION
-
 def age(bot, update):
     user = update.message.from_user
     logger.info("Age of %s: %s" % (user.first_name, update.message.text))
@@ -91,22 +85,11 @@ def age(bot, update):
     with open(final, "a") as _file:
         _file.write("%s\n" % (update.message.text))
         _file.close()
-        
+
     update.message.reply_text('Thanks! Now, where are you from?')
 
     return LOCATION
 
-#def skip_location(bot, update):
-#    user = update.message.from_user
-#    logger.info("User %s did not send age." % user.first_name)
-#
-#    update.message.reply_text('Not a problem')
-#
-#    update.message.reply_text('Lets start with our conversation then...')
-#    update.message.reply_text('Why dont you ask me something?')
-#    update.message.reply_text('I might not be able to answer but i will try my best')
-#
-#    return QUESTION
 
 def location(bot, update):
 
@@ -129,7 +112,7 @@ def recieve_question(bot, update):
     user = update.message.from_user
     logger.info("%s sent a question" % user.first_name)
 
-    if current_question > 0:
+    if filled:
         return check_question(user, update)
     else :
         return filling_user(user,update)
@@ -143,14 +126,14 @@ def filling_user(_user,_update):
                 lines = [x.strip() for x in lines]
 
                 _newuser = User.t_users()
-                _newuser.FillNewUser(str(_user.id), lines[2], int(lines[1]), lines[0])
+                _newuser.FillNewUser(str(_user.id), str(lines[2]), str(lines[1]), str(lines[0]))
 
                 _file.close()
     except EnvironmentError: # parent of IOError, OSError *and* WindowsError where available
         logger.warn("ERROR")
 
     os.remove(final)
-
+    toggleFilled()
     return check_question(_user,_update)
 
 def check_question(_user,_update):
@@ -158,13 +141,13 @@ def check_question(_user,_update):
 
     if(_newquestion.AlreadyExistent(_update.message.text)):
         return answer_question(_user,_update)
-    else: 
+    else:
         return filling_question(_user,_update)
 
 def filling_question(_user,_update):
 
     _newquestion = Question.t_questions()
-    _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, topics[current_topic])    
+    _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, topics[current_topic])
 
     _update.message.reply_text('I dont know how to answer that question yet')
     _update.message.reply_text('Guess its my turn then...')
@@ -176,31 +159,38 @@ def answer_question(_user, _update):
     temp_ID = _newquestion.GetIDByQuestion(_update.message.text)[0]
 
     _newanswer = Answer.t_answers()
-   
+
     if (_newanswer.AlreadyExistent(temp_ID)):#we have an answer
         _update.message.reply_text(_newanswer.GetAnswerByQuestionID(temp_ID)[0])#indexing for answers
-    else: 
+    else:
         _update.message.reply_text('I dont know how to answer that question yet')
 
     _update.message.reply_text('Guess its my turn now')
 
-    return ask_question(_user, _update) 
+    return ask_question(_user, _update)
 
 def ask_question(_user, _update):
     _newquestion = Question.t_questions()
     _update.message.reply_text(_newquestion.GetQuestionByTopic(topics[current_topic])[0])
-    
+
     return ANSWER
 
 def recieve_answer(bot, update):
     user = update.message.from_user
     logger.info("%s answered a question" % user.first_name)
-
     _newquestion = Question.t_questions()
-    temp_question = _newquestion.GetQuestionByTopic(topics[current_topic])[0]
-    temp_id =_newquestion.GetIDByQuestion(temp_question)[0]
 
     increment_question();
+
+    if current_question >= current_topic_max_questions:
+        reset_question()
+        if (increment_topic() == False):
+            reset_topics()
+            return cancel(bot,update)
+
+
+    temp_question = _newquestion.GetQuestionByTopic(topics[current_topic])[0]
+    temp_id =_newquestion.GetIDByQuestion(temp_question)[0]
 
     _newanswer = Answer.t_answers()
     _newanswer.FillNewAnswer(user.id, temp_id, update.message.text)
@@ -210,8 +200,30 @@ def recieve_answer(bot, update):
     return QUESTION
 
 def increment_question():
-    global current_question 
+    global current_question
     current_question += 1
+
+def set_max_questions_by_topic(_max):
+    global current_topic_max_questions
+    current_topic_max_questions = _max
+
+def reset_question():
+    global current_question
+    current_question = 0
+
+def reset_topics():
+    global current_topic
+    current_topic = 0
+
+def increment_topic():
+    global current_topic
+    current_topic += 1
+    print len(topics)
+    if current_topic >= len(topics):
+        return False
+    else:
+        _newquestion = Question.t_questions()
+        set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(topics[current_topic]))
 
 def cancel(bot, update):
     user = update.message.from_user
@@ -232,7 +244,7 @@ def filecheck(file_name):
 
     except IOError: #lets make use of the default file i/o library exception handler
         logger.info("No file found \n")
-        return    
+        return
 
 def main():
     # Create the EventHandler and pass it your bot's token.
@@ -249,18 +261,18 @@ def main():
         entry_points =  [CommandHandler('start', start)],
 
         states = {
-            GENDER:     [MessageHandler(Filters.text, gender)],
+            GENDER:     [MessageHandler(Filters.all, gender)],
                         #CommandHandler('skip', skip_gender)],
 
-            AGE:        [MessageHandler(Filters.text, age)],
+            AGE:        [MessageHandler(Filters.all, age)],
                         #CommandHandler('skip', skip_age)],
 
-            LOCATION:   [MessageHandler(Filters.text, location)],
+            LOCATION:   [MessageHandler(Filters.all, location)],
                         #CommandHandler('skip', skip_location)],
 
-            QUESTION:   [MessageHandler(Filters.text, recieve_question)],
+            QUESTION:   [MessageHandler(Filters.all, recieve_question)],
 
-            ANSWER:     [MessageHandler(Filters.text, recieve_answer)], 
+            ANSWER:     [MessageHandler(Filters.all, recieve_answer)],
         },
 
         fallbacks =     [CommandHandler('cancel', cancel)]

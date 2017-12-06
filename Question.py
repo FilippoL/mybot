@@ -4,6 +4,19 @@ import random
 
 class t_questions(Database.database):
 
+    def GetMaxQuestionByTopic(slef, _topic = ""):
+        db = sqlite3.connect("chatbox_database.db")
+
+        crsr = db.cursor()
+        crsr = db.execute('select question from questions where topic = ? ', (_topic, ))
+
+        questions_array = crsr.fetchall()
+        result = len(questions_array)
+
+        db.commit()
+        db.close()
+        return result
+
     def FillNewQuestion(self, _id = "", _question = "", _topic = ""):
         db = sqlite3.connect("chatbox_database.db")
         db.execute('insert into questions (ID, question, topic) values (?, ?, ?)', (_id, _question.lower(), _topic.lower()))
@@ -13,7 +26,7 @@ class t_questions(Database.database):
 
     def GetQuestionByTopic(self, _topic = ""):
         db = sqlite3.connect("chatbox_database.db")
-        
+
         crsr = db.cursor()
         crsr = db.execute('select question from questions where topic = ? ', (_topic, ))
 
