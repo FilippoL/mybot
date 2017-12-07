@@ -18,6 +18,7 @@ bot.
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler, ConversationHandler)
 
+import nltk
 import logging
 import uuid
 import os
@@ -218,7 +219,7 @@ def reset_topics():
 def increment_topic():
     global current_topic
     current_topic += 1
-    print len(topics)
+
     if current_topic >= len(topics):
         return False
     else:
@@ -237,6 +238,10 @@ def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
 def filecheck(file_name):
+
+    text = nltk.word_tokenize("I am a student")
+    print(nltk.pos_tag(text, tagset = 'universal'))
+
     try:
         open(file_name, "r") #try open file for reading
         logger.info("File found \n")
