@@ -19,10 +19,13 @@ from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler, ConversationHandler)
 
 import nltk
+from nltk.corpus import wordnet as wn
+from nltk.corpus import wordnet_ic
 import logging
 import uuid
 import os
 
+import collections
 import Database
 import Question
 import Answer
@@ -33,9 +36,9 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-topics = ("brexit", "food")
+topics = ("hobbies", "time", "sleep", "music", "love", "work", "food", "beauty", "animals", "learning", "goals", "dreams", "shopping", "money", "politics", "news", "cooking", "sports")
 
-current_topic = 0
+current_topic = ""
 current_question = 0
 unanswered_question = 0
 
@@ -43,6 +46,74 @@ current_topic_max_questions = 0
 filled = False
 
 GENDER, AGE, LOCATION, QUESTION, ANSWER = range(5)
+
+class PhraseManager:
+    def __init__(self):#this is a contrucstor
+
+            pass
+
+    def IsAQuestion(self, strPhrase):
+        text = nltk.word_tokenize(strPhrase)
+        _words = []
+        c = 0
+        for c , _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
+            if _words[1] == "VERB" and nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "ADV":
+                if nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "how":
+                    print(c, _words[1][0])
+                    return True
+                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "where":
+                    print(c, _words[1][0])
+                    return True
+                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "what":
+                    print(c, _words[1][0])
+                    return True
+                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "why":
+                    print(c, _words[1][0])
+                    return True
+                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "when":
+                    print(c, _words[1][0])
+                    return True
+                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "who":
+                    print(c, _words[1][0])
+                    return True
+
+            if _words[1] == "VERB" and c == 0:
+                print(c, _words[1][0])
+                return True
+
+            if _words[1] == "VERB" and (nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "PRON" or nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "NOUN"):
+                if nltk.pos_tag(text, tagset = 'universal')[c-2][1] == "VERB":
+                    print(c, _words[1][0])
+                    return True
+
+        return False
+
+    def GuessTopic(self, strPhrase):
+        text = nltk.word_tokenize(strPhrase)
+        _words = []
+        tops = []
+        brown_ic = wordnet_ic.ic('ic-brown.dat')
+        c = 0
+        for c, _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
+            if _words[1] == "NOUN":
+                print(_words[0])
+                _word = wn.synsets(_words[0], 'n')[0]
+                _word.hyponyms()
+                best_str = ""
+                best_f = 0.0
+                for _t in topics:
+                    _topic = wn.synsets(_t, 'n')[0]
+                    _topic.hyponyms()
+                    if _topic.lin_similarity(_word, brown_ic) > best_f:
+                        best_f = _topic.lin_similarity(_word, brown_ic)
+                        best_str = _t
+                tops.append(best_str)
+        cnt = collections.Counter()
+        for _best_in_tops in tops:
+            cnt[_best_in_tops] += 1
+        print("TOPIC: " + str(cnt.most_common(1)[0][0]))
+        return topics.index(str(cnt.most_common(1)[0][0]))
+
 
 def toggleFilled():
     global filled
@@ -57,7 +128,7 @@ def start(bot, update):
     #update.message.reply_text('Remember to send /skip if you dont want to answer them')
 
     _newquestion = Question.t_questions()
-    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(topics[current_topic]))
+    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(current_topic))
 
     update.message.reply_text('Are you a boy or a girl?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return GENDER
@@ -139,7 +210,9 @@ def filling_user(_user,_update):
 
 def check_question(_user,_update):
     _newquestion = Question.t_questions()
-
+    _phrase = PhraseManager()
+    if _phrase.IsAQuestion(_update.message.text):
+        set_cur_topic(_phrase.GuessTopic(_update.message.text))
     if(_newquestion.AlreadyExistent(_update.message.text)):
         return answer_question(_user,_update)
     else:
@@ -148,7 +221,7 @@ def check_question(_user,_update):
 def filling_question(_user,_update):
 
     _newquestion = Question.t_questions()
-    _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, topics[current_topic])
+    _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, current_topic)
 
     _update.message.reply_text('I dont know how to answer that question yet')
     _update.message.reply_text('Guess its my turn then...')
@@ -172,7 +245,7 @@ def answer_question(_user, _update):
 
 def ask_question(_user, _update):
     _newquestion = Question.t_questions()
-    _update.message.reply_text(_newquestion.GetQuestionByTopic(topics[current_topic])[0])
+    _update.message.reply_text(_newquestion.GetQuestionByTopic(current_topic)[0])
 
     return ANSWER
 
@@ -185,12 +258,10 @@ def recieve_answer(bot, update):
 
     if current_question >= current_topic_max_questions:
         reset_question()
-        if (increment_topic() == False):
-            reset_topics()
-            return cancel(bot,update)
+        #ASK IF WE CAN CHANGE TOPIC CAUSE WE RUN OUT
 
 
-    temp_question = _newquestion.GetQuestionByTopic(topics[current_topic])[0]
+    temp_question = _newquestion.GetQuestionByTopic(current_topic)[0]
     temp_id =_newquestion.GetIDByQuestion(temp_question)[0]
 
     _newanswer = Answer.t_answers()
@@ -212,19 +283,12 @@ def reset_question():
     global current_question
     current_question = 0
 
-def reset_topics():
+def set_cur_topic(_curr):
     global current_topic
-    current_topic = 0
+    current_topic = _curr
 
-def increment_topic():
-    global current_topic
-    current_topic += 1
-
-    if current_topic >= len(topics):
-        return False
-    else:
-        _newquestion = Question.t_questions()
-        set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(topics[current_topic]))
+    _newquestion = Question.t_questions()
+    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(current_topic))
 
 def cancel(bot, update):
     user = update.message.from_user
@@ -238,9 +302,6 @@ def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
 def filecheck(file_name):
-
-    text = nltk.word_tokenize("I am a student")
-    print(nltk.pos_tag(text, tagset = 'universal'))
 
     try:
         open(file_name, "r") #try open file for reading
