@@ -36,7 +36,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 logger = logging.getLogger(__name__)
 
-topics = ("hobbies", "time", "sleep", "music", "love", "work", "food", "beauty", "animals", "learning", "goals", "dreams", "shopping", "money", "politics", "news", "cooking", "sports")
+topics = ("hobbies", "time", "music", "love", "work", "food", "persons", "animals", "learning", "goals", "dreams", "shopping", "money", "politics", "news", "cooking", "sports")
 
 current_topic = ""
 current_question = 0
@@ -128,6 +128,7 @@ def start(bot, update):
     #update.message.reply_text('Remember to send /skip if you dont want to answer them')
 
     _newquestion = Question.t_questions()
+
     set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(current_topic))
 
     update.message.reply_text('Are you a boy or a girl?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
@@ -212,7 +213,8 @@ def check_question(_user,_update):
     _newquestion = Question.t_questions()
     _phrase = PhraseManager()
     if _phrase.IsAQuestion(_update.message.text):
-        set_cur_topic(_phrase.GuessTopic(_update.message.text))
+        set_cur_topic(topics[_phrase.GuessTopic(_update.message.text)])
+
     if(_newquestion.AlreadyExistent(_update.message.text)):
         return answer_question(_user,_update)
     else:
@@ -245,9 +247,14 @@ def answer_question(_user, _update):
 
 def ask_question(_user, _update):
     _newquestion = Question.t_questions()
-    _update.message.reply_text(_newquestion.GetQuestionByTopic(current_topic)[0])
+    if _newquestion.GetQuestionByTopic(current_topic)[0]:
+        _update.message.reply_text(_newquestion.GetQuestionByTopic(current_topic)[0])
+        return ANSWER
+    else:
+        _update.message.reply_text("Dont really know what to say about " + current_topic)
+        update.message.reply_text("Its your turn now! Ask me something...")
+        return QUESTION
 
-    return ANSWER
 
 def recieve_answer(bot, update):
     user = update.message.from_user

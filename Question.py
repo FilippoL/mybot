@@ -19,25 +19,24 @@ class t_questions(Database.database):
 
     def FillNewQuestion(self, _id = "", _question = "", _topic = ""):
         db = sqlite3.connect("chatbox_database.db")
-        db.execute('insert into questions (ID, question, topic) values (?, ?, ?)', (_id, _question.lower(), _topic.lower()))
-
+        print (_topic)
+        db.execute('insert into questions (ID, question, topic) values (?, ?, ?)', (_id, _question.lower(), _topic))
         db.commit()
         db.close()
 
     def GetQuestionByTopic(self, _topic = ""):
         db = sqlite3.connect("chatbox_database.db")
-
         crsr = db.cursor()
         crsr = db.execute('select question from questions where topic = ? ', (_topic, ))
-
         questions_array = crsr.fetchall()
-        result = len(questions_array)
-        question_str = questions_array[random.randint(0,result-1)]
-
         db.commit()
         db.close()
-
-        return question_str
+        result = len(questions_array)
+        if result:
+            question_str = questions_array[random.randint(0,result-1)]
+            return question_str
+        else:
+            return False
 
     def GetIDByQuestion(self, _question = ""):
         db = sqlite3.connect("chatbox_database.db")
