@@ -40,9 +40,7 @@ topics = ("hobbies", "time", "music", "love", "work", "food", "persons", "animal
 
 current_topic = ""
 current_question = 0
-unanswered_question = 0
 
-current_topic_max_questions = 0
 filled = False
 
 GENDER, AGE, LOCATION, QUESTION, ANSWER = range(5)
@@ -127,9 +125,6 @@ def start(bot, update):
     update.message.reply_text('Honesty is appreciated :)')
     #update.message.reply_text('Remember to send /skip if you dont want to answer them')
 
-    _newquestion = Question.t_questions()
-
-    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(current_topic))
 
     update.message.reply_text('Are you a boy or a girl?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return GENDER
@@ -213,7 +208,8 @@ def check_question(_user,_update):
     _newquestion = Question.t_questions()
     _phrase = PhraseManager()
     if _phrase.IsAQuestion(_update.message.text):
-        set_cur_topic(topics[_phrase.GuessTopic(_update.message.text)])
+        if current_topic != topics[_phrase.GuessTopic(_update.message.text)]:
+            set_cur_topic(topics[_phrase.GuessTopic(_update.message.text)])
 
     if(_newquestion.AlreadyExistent(_update.message.text)):
         return answer_question(_user,_update)
@@ -263,7 +259,7 @@ def recieve_answer(bot, update):
 
     increment_question();
 
-    if current_question >= current_topic_max_questions:
+    if current_question >= _newquestion.GetMaxQuestionByTopic(current_topic):
         reset_question()
         #ASK IF WE CAN CHANGE TOPIC CAUSE WE RUN OUT
 
@@ -282,10 +278,6 @@ def increment_question():
     global current_question
     current_question += 1
 
-def set_max_questions_by_topic(_max):
-    global current_topic_max_questions
-    current_topic_max_questions = _max
-
 def reset_question():
     global current_question
     current_question = 0
@@ -294,8 +286,6 @@ def set_cur_topic(_curr):
     global current_topic
     current_topic = _curr
 
-    _newquestion = Question.t_questions()
-    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(current_topic))
 
 def cancel(bot, update):
     user = update.message.from_user
