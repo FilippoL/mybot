@@ -1,35 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
-# Simple Bot to reply to Telegram messages
-# This program is dedicated to the public domain under the CC0 license.
-"""
-This Bot uses the Updater class to handle the bot.
-First, a few callback functions are defined. Then, those functions are passed to
-the Dispatcher and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-Usage:
-Example of a bot-user conversation using ConversationHandler.
-Send /start to initiate the conversation.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
+
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler, ConversationHandler)
 
-import nltk
-from nltk.corpus import wordnet as wn
-from nltk.corpus import wordnet_ic
+
 import logging
 import uuid
 import os
 
-import collections
 import Database
 import Question
 import Answer
 import User
+import PhraseManager
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -44,73 +29,6 @@ current_question = 0
 filled = False
 
 GENDER, AGE, LOCATION, QUESTION, ANSWER = range(5)
-
-class PhraseManager:
-    def __init__(self):#this is a contrucstor
-
-            pass
-
-    def IsAQuestion(self, strPhrase):
-        text = nltk.word_tokenize(strPhrase)
-        _words = []
-        c = 0
-        for c , _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
-            if _words[1] == "VERB" and nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "ADV":
-                if nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "how":
-                    print(c, _words[1][0])
-                    return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "where":
-                    print(c, _words[1][0])
-                    return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "what":
-                    print(c, _words[1][0])
-                    return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "why":
-                    print(c, _words[1][0])
-                    return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "when":
-                    print(c, _words[1][0])
-                    return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "who":
-                    print(c, _words[1][0])
-                    return True
-
-            if _words[1] == "VERB" and c == 0:
-                print(c, _words[1][0])
-                return True
-
-            if _words[1] == "VERB" and (nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "PRON" or nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "NOUN"):
-                if nltk.pos_tag(text, tagset = 'universal')[c-2][1] == "VERB":
-                    print(c, _words[1][0])
-                    return True
-
-        return False
-
-    def GuessTopic(self, strPhrase):
-        text = nltk.word_tokenize(strPhrase)
-        _words = []
-        tops = []
-        brown_ic = wordnet_ic.ic('ic-brown.dat')
-        c = 0
-        for c, _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
-            if _words[1] == "NOUN":
-                print(_words[0])
-                _word = wn.synsets(_words[0], 'n')[0]
-                _word.hyponyms()
-                best_str = ""
-                best_f = 0.0
-                for _t in topics:
-                    _topic = wn.synsets(_t, 'n')[0]
-                    _topic.hyponyms()
-                    if _topic.lin_similarity(_word, brown_ic) > best_f:
-                        best_f = _topic.lin_similarity(_word, brown_ic)
-                        best_str = _t
-                tops.append(best_str)
-        cnt = collections.Counter()
-        for _best_in_tops in tops:
-            cnt[_best_in_tops] += 1
-        print("TOPIC: " + str(cnt.most_common(1)[0][0]))
-        return topics.index(str(cnt.most_common(1)[0][0]))
 
 
 def toggleFilled():
@@ -206,7 +124,7 @@ def filling_user(_user,_update):
 
 def check_question(_user,_update):
     _newquestion = Question.t_questions()
-    _phrase = PhraseManager()
+    _phrase = PhraseManager.Phrase()
     if _phrase.IsAQuestion(_update.message.text):
         if current_topic != topics[_phrase.GuessTopic(_update.message.text)]:
             set_cur_topic(topics[_phrase.GuessTopic(_update.message.text)])

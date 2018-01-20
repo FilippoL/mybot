@@ -19,7 +19,7 @@ class t_questions(Database.database):
 
     def FillNewQuestion(self, _id = "", _question = "", _topic = ""):
         db = sqlite3.connect("chatbox_database.db")
-        print (_topic)
+        print(_topic)
         db.execute('insert into questions (ID, question, topic) values (?, ?, ?)', (_id, _question.lower(), _topic))
         db.commit()
         db.close()
