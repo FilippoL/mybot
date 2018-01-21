@@ -16,35 +16,30 @@ class Phrase:
         text = nltk.word_tokenize(strPhrase)
         _words = []
         c = 0
-        for c , _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
-            if _words[1] == "VERB" and nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "ADV":
-                if nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "how":
-                    print(c, _words[1][0])
+
+        if strPhrase[len(strPhrase)-1] == "?":
+        
+            for c , _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
+
+                if _words[0] == "how":
                     return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "where":
-                    print(c, _words[1][0])
+                elif _words[0] == "where":
                     return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "what":
-                    print(c, _words[1][0])
+                elif _words[0] == "what":
                     return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "why":
-                    print(c, _words[1][0])
+                elif _words[0] == "why":
                     return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "when":
-                    print(c, _words[1][0])
+                elif _words[0] == "when":
                     return True
-                elif nltk.pos_tag(text, tagset = 'universal')[c-1][0] == "who":
-                    print(c, _words[1][0])
+                elif _words[0] == "who":
                     return True
 
-            if _words[1] == "VERB" and c == 0:
-                print(c, _words[1][0])
-                return True
-
-            if _words[1] == "VERB" and (nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "PRON" or nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "NOUN"):
-                if nltk.pos_tag(text, tagset = 'universal')[c-2][1] == "VERB":
-                    print(c, _words[1][0])
+                if _words[1] == "VERB" and c == 0:
                     return True
+
+                if _words[1] == "VERB" and (nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "PRON" or nltk.pos_tag(text, tagset = 'universal')[c-1][1] == "NOUN"):
+                    if nltk.pos_tag(text, tagset = 'universal')[c-2][1] == "VERB":
+                        return True
 
         return False
 
