@@ -126,13 +126,18 @@ def check_question(_user,_update):
     _newquestion = Question.t_questions()
     _phrase = PhraseManager.Phrase()
     if _phrase.IsAQuestion(_update.message.text):
-        if current_topic != topics[_phrase.GuessTopic(_update.message.text)]:
-            set_cur_topic(topics[_phrase.GuessTopic(_update.message.text)])
+        _guessed_result = _phrase.GuessTopic(_update.message.text)
+        if current_topic != topics[_guessed_result]:
+            set_cur_topic(topics[_guessed_result])
 
-    if(_newquestion.AlreadyExistent(_update.message.text)):
-        return answer_question(_user,_update)
+        if(_newquestion.AlreadyExistent(_update.message.text)):
+            return answer_question(_user,_update)
+        else:
+            return filling_question(_user,_update)
     else:
-        return filling_question(_user,_update)
+        _update.message.reply_text('I cant answer statemets yet. Ask a question :)')
+        return QUESTION
+
 
 def filling_question(_user,_update):
 

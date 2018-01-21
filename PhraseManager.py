@@ -18,7 +18,7 @@ class Phrase:
         c = 0
 
         if strPhrase[len(strPhrase)-1] == "?":
-        
+
             for c , _words in enumerate(nltk.pos_tag(text, tagset = 'universal')):
 
                 if _words[0] == "how":
