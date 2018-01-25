@@ -66,8 +66,11 @@ class Phrase:
                         best_f = _topic.lin_similarity(_word, brown_ic)
                         best_str = _t
                 tops.append(best_str)
-        cnt = collections.Counter()
-        for _best_in_tops in tops:
-            cnt[_best_in_tops] += 1
-        print("TOPIC: " + str(cnt.most_common(1)[0][0]))
-        return topics.index(str(cnt.most_common(1)[0][0]))
+        if not tops:
+            return 0
+        else:
+            cnt = collections.Counter()
+            for _best_in_tops in tops:
+                cnt[_best_in_tops] += 1
+            print("TOPIC: " + str(cnt.most_common(1)[0][0]))
+            return topics.index(str(cnt.most_common(1)[0][0])) + 1
