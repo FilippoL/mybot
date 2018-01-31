@@ -240,7 +240,7 @@ def filecheck(file_name):
 
 def main():
     # Create the EventHandler and pass it your bot's token.
-    updater = Updater("478466244:AAGx1DMPPeWhpwVnVwwqDM3pQk9IZZ_6xFw")
+    updater = Updater("478466244:AAGx1DMPPeWhpwVnVwwqDM3pQk9IZZ_6xFw")#gitignore
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
