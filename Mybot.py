@@ -1,24 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
-# Simple Bot to reply to Telegram messages
-# This program is dedicated to the public domain under the CC0 license.
-"""
-This Bot uses the Updater class to handle the bot.
-First, a few callback functions are defined. Then, those functions are passed to
-the Dispatcher and registered at their respective places.
-Then, the bot is started and runs until we press Ctrl-C on the command line.
-Usage:
-Example of a bot-user conversation using ConversationHandler.
-Send /start to initiate the conversation.
-Press Ctrl-C on the command line or send a signal to the process to stop the
-bot.
-"""
+
 
 from telegram import (ReplyKeyboardMarkup, ReplyKeyboardRemove)
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, RegexHandler, ConversationHandler)
 
-import nltk
+
 import logging
 import uuid
 import os
@@ -27,22 +14,22 @@ import Database
 import Question
 import Answer
 import User
+import PhraseManager
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
-topics = ("brexit", "food")
+topics = ("self", "hobbies", "time", "music", "love", "work", "food", "persons", "animals", "learning", "goals", "dreams", "shopping", "money", "politics", "news", "cooking", "sports")
 
-current_topic = 0
+current_topic = ""
 current_question = 0
-unanswered_question = 0
 
-current_topic_max_questions = 0
 filled = False
 
 GENDER, AGE, LOCATION, QUESTION, ANSWER = range(5)
+
 
 def toggleFilled():
     global filled
@@ -56,8 +43,6 @@ def start(bot, update):
     update.message.reply_text('Honesty is appreciated :)')
     #update.message.reply_text('Remember to send /skip if you dont want to answer them')
 
-    _newquestion = Question.t_questions()
-    set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(topics[current_topic]))
 
     update.message.reply_text('Are you a boy or a girl?', reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True))
     return GENDER
@@ -111,6 +96,10 @@ def location(bot, update):
 
 def recieve_question(bot, update):
     user = update.message.from_user
+
+    if update.message.text == "/cancel":
+        return cancel(bot, update)
+        
     logger.info("%s sent a question" % user.first_name)
 
     if filled:
@@ -139,16 +128,25 @@ def filling_user(_user,_update):
 
 def check_question(_user,_update):
     _newquestion = Question.t_questions()
+    _phrase = PhraseManager.Phrase()
+    if _phrase.IsAQuestion(_update.message.text):
+        _guessed_result = _phrase.GuessTopic(_update.message.text)
+        if current_topic != topics[_guessed_result]:
+            set_cur_topic(topics[_guessed_result])
 
-    if(_newquestion.AlreadyExistent(_update.message.text)):
-        return answer_question(_user,_update)
+        if(_newquestion.AlreadyExistent(_update.message.text)):
+            return answer_question(_user,_update)
+        else:
+            return filling_question(_user,_update)
     else:
-        return filling_question(_user,_update)
+        _update.message.reply_text('I cant answer statemets yet. Ask a question :)')
+        return QUESTION
+
 
 def filling_question(_user,_update):
 
     _newquestion = Question.t_questions()
-    _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, topics[current_topic])
+    _newquestion.FillNewQuestion(str(uuid.uuid4()), _update.message.text, current_topic)
 
     _update.message.reply_text('I dont know how to answer that question yet')
     _update.message.reply_text('Guess its my turn then...')
@@ -172,25 +170,32 @@ def answer_question(_user, _update):
 
 def ask_question(_user, _update):
     _newquestion = Question.t_questions()
-    _update.message.reply_text(_newquestion.GetQuestionByTopic(topics[current_topic])[0])
+    if _newquestion.GetQuestionByTopic(current_topic)[0]:
+        _update.message.reply_text(_newquestion.GetQuestionByTopic(current_topic)[0])
+        return ANSWER
+    else:
+        _update.message.reply_text("Dont really know what to say about " + current_topic)
+        update.message.reply_text("Its your turn now! Ask me something...")
+        return QUESTION
 
-    return ANSWER
 
 def recieve_answer(bot, update):
     user = update.message.from_user
+
+    if update.message.text == "/cancel":
+        return cancel(bot, update)
+    
     logger.info("%s answered a question" % user.first_name)
     _newquestion = Question.t_questions()
 
     increment_question();
 
-    if current_question >= current_topic_max_questions:
+    if current_question >= _newquestion.GetMaxQuestionByTopic(current_topic):
         reset_question()
-        if (increment_topic() == False):
-            reset_topics()
-            return cancel(bot,update)
+        #ASK IF WE CAN CHANGE TOPIC CAUSE WE RUN OUT
 
 
-    temp_question = _newquestion.GetQuestionByTopic(topics[current_topic])[0]
+    temp_question = _newquestion.GetQuestionByTopic(current_topic)[0]
     temp_id =_newquestion.GetIDByQuestion(temp_question)[0]
 
     _newanswer = Answer.t_answers()
@@ -204,31 +209,16 @@ def increment_question():
     global current_question
     current_question += 1
 
-def set_max_questions_by_topic(_max):
-    global current_topic_max_questions
-    current_topic_max_questions = _max
-
 def reset_question():
     global current_question
     current_question = 0
 
-def reset_topics():
+def set_cur_topic(_curr):
     global current_topic
-    current_topic = 0
+    current_topic = _curr
 
-def increment_topic():
-    global current_topic
-    current_topic += 1
-
-    if current_topic >= len(topics):
-        return False
-    else:
-        _newquestion = Question.t_questions()
-        set_max_questions_by_topic(_newquestion.GetMaxQuestionByTopic(topics[current_topic]))
 
 def cancel(bot, update):
-    user = update.message.from_user
-    logger.info("User %s canceled the conversation." % user.first_name)
 
     update.message.reply_text('Bye! I hope we can talk again some day.', reply_markup=ReplyKeyboardRemove())
 
@@ -238,9 +228,6 @@ def error(bot, update, error):
     logger.warn('Update "%s" caused error "%s"' % (update, error))
 
 def filecheck(file_name):
-
-    text = nltk.word_tokenize("I am a student")
-    print(nltk.pos_tag(text, tagset = 'universal'))
 
     try:
         open(file_name, "r") #try open file for reading
